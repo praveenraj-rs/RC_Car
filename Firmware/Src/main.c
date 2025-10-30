@@ -1,15 +1,38 @@
 #include "stm32f4xx.h"
 
-#define SysClk 16000000U 	// 16MHz system clock freq
+#define B_LED 13 			// PC13 Builtin LED
+#define Btn 0 				// PA0 push-btn active low
 
+#define SysClk 16000000U 		// 16MHz system clock freq
 #define Motor_PWM_Freq 1000U	// 1KHz motor PWM freq
-#define Servo_PWM_Freq 50U	// 50Hz servo control freq
+#define Servo_PWM_Freq 50U		// 50Hz servo control freq
 
 #define Motor 8U 			// PA8 Tim1Ch1 PWM
 #define Servo 15U 			// PA15 Tim2Ch1 PWM
 
+#define Tx1	9				// PA9 Tx UART1
+#define Rx1 10				// PA10 Rx UART1
 
-void Motor_PWM_Init()
+
+
+void B_LED_Init(void)
+{
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; 	// Enable GPIOA clock
+	GPIOC->MODER &= ~(3U << (B_LED * 2));	// Clear reg
+	GPIOC->MODER |=  (1U << (B_LED * 2));  	// Output mode
+	GPIOC->OTYPER |= (1U << B_LED);		// Open drain
+	GPIOC->PUPDR &= ~(3U << (B_LED * 2));	// No pull-up or pull-down
+}
+
+void Btn_Init(void)
+{
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+    GPIOA->MODER &= ~(3U << (Btn * 2));    // 00: Input mode
+    GPIOA->PUPDR &= ~(3U << (Btn * 2));    // 00: No pull-up, no pull-down
+}
+
+
+void Motor_PWM_Init(void)
 {
    // Enable clocks for GPIOA and TIM1
    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -55,8 +78,7 @@ void Motor_PWM_SetDutyCycle(uint8_t duty_cycle)
    TIM1->CCR1 = ((TIM1->ARR + 1) * duty_cycle) / 100;
 }
 
-
-void Servo_PWM_Init()
+void Servo_PWM_Init(void)
 {
    // Enable clocks for GPIOA and TIM1
    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -92,21 +114,82 @@ void Servo_PWM_Init()
    TIM2->CR1 |= TIM_CR1_CEN;	// Start timer
 }
 
-
-// Function to update PWM duty cycle 0-100%
 void Servo_PWM_SetDutyCycle(uint8_t duty_cycle)
 {
    if(duty_cycle > 100) duty_cycle = 100;
    TIM2->CCR1 = ((TIM2->ARR + 1) * duty_cycle) / 100;
 }
 
+void UART1_Init(void)
+{
+	 // Enable clocks for GPIOA and USART1
+	 RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;   // GPIOA clock enable
+	 RCC->APB2ENR |= RCC_APB2ENR_USART1EN;  // USART1 clock enable
+
+	 // Configure PA9 (TX1) and PA10 (RX1) as Alternate Function 7 (AF7)
+	 GPIOA->MODER &= ~( (3U << (Tx1 * 2)) | (3U << (Rx1 * 2)) );  // clear
+	 GPIOA->MODER |=  ( (2U << (Tx1 * 2)) | (2U << (Rx1 * 2)) );  // AF mode
+	 GPIOA->AFR[1] &= ~( (0xFU << ((Tx1 - 8) * 4)) | (0xFU << ((Rx1 - 8) * 4)) );
+	 GPIOA->AFR[1] |=  ( (7U << ((Tx1 - 8) * 4)) | (7U << ((Rx1 - 8) * 4)) );  // AF7 for USART1
+	 GPIOA->OSPEEDR |= (3U << (Tx1 * 2)) | (3U << (Rx1 * 2));  // High speed
+
+	 // Configure USART1
+	 USART1->CR1 = 0;  // disable before config
+	 USART1->BRR = 0x0683;  // 9600 baud @16 MHz
+
+	 USART1->CR1 |= (USART_CR1_TE | USART_CR1_RE);  // Enable TX, RX
+	 USART1->CR1 |= USART_CR1_UE;                   // Enable USART1
+}
+
+void UART1_Send_Char(char c)
+{
+	while (!(USART1->SR & USART_SR_TXE));  // wait until TX buffer empty
+	USART1->DR = (c & 0xFF);
+}
+
+void UART1_Send_Str(char *str)
+{
+	 while(*str)
+	 {
+		 UART1_Send_Char(*str++);
+	 }
+}
+
+char UART1_Receive_Char(void)
+{
+    while (!(USART1->SR & USART_SR_RXNE));  // wait until data received
+    return (char)(USART1->DR & 0xFF);
+}
+
+void UART1_Receive_Str(char *buffer)
+{
+    char c;
+    uint16_t i = 0;
+    do {
+        c = UART1_Receive_Char();
+        buffer[i++] = c;
+    } while (c != '\n' && c != '\r');  // until newline or carriage return
+    buffer[i] = '\0';  // null terminate
+}
 
 int main(void)
 {
-   Motor_PWM_Init();			// Motor PWM init
-   Motor_PWM_SetDutyCycle(50);  // 50% duty cycle
+//   Motor_PWM_Init();			// Motor PWM init
+//   Motor_PWM_SetDutyCycle(50);  // 50% duty cycle
+//
+//   Servo_PWM_Init();			// Motor PWM init
+//   Servo_PWM_SetDutyCycle(80);  // 80% duty cycle
 
-   Servo_PWM_Init();			// Motor PWM init
-   Servo_PWM_SetDutyCycle(80);  // 80% duty cycle
-   while(1);
+	B_LED_Init();
+	Btn_Init();
+	while(1)
+	{
+		if (!(GPIOA->IDR & (1U << Btn)))  // Active LOW
+		{
+			while (!(GPIOA->IDR & (1U << Btn)));  // Wait for release
+			GPIOC->ODR ^= (1U << B_LED);          // Toggle LED (active LOW)
+			for (volatile int i = 0; i < 50000; i++); // Debounce
+		}
+		for (volatile int i = 0; i < 90000; i++); // Debounce
+	}
 }
