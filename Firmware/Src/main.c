@@ -13,22 +13,23 @@
 #define Tx1	9				// PA9 Tx UART1
 #define Rx1 10				// PA10 Rx UART1
 
-
-
 void B_LED_Init(void)
 {
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; 	// Enable GPIOA clock
 	GPIOC->MODER &= ~(3U << (B_LED * 2));	// Clear reg
 	GPIOC->MODER |=  (1U << (B_LED * 2));  	// Output mode
-	GPIOC->OTYPER |= (1U << B_LED);		// Open drain
+	GPIOC->OTYPER &= ~(1U << B_LED);		// Push-pull
 	GPIOC->PUPDR &= ~(3U << (B_LED * 2));	// No pull-up or pull-down
+	GPIOC->ODR |= (1<<B_LED); 				// LED off
+
 }
 
 void Btn_Init(void)
 {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-    GPIOA->MODER &= ~(3U << (Btn * 2));    // 00: Input mode
-    GPIOA->PUPDR &= ~(3U << (Btn * 2));    // 00: No pull-up, no pull-down
+    GPIOA->MODER &= ~(3U << (Btn * 2));    	// Input mode
+    GPIOA->PUPDR &= ~(3U << (Btn * 2));   	// Clear reg
+    GPIOA->PUPDR |= (1U << (Btn * 2));		// Pull-up config
 }
 
 
@@ -182,6 +183,9 @@ int main(void)
 
 	B_LED_Init();
 	Btn_Init();
+	UART1_Init();
+	char name1[] = "raj";
+	char name2[20];
 	while(1)
 	{
 		if (!(GPIOA->IDR & (1U << Btn)))  // Active LOW
@@ -190,6 +194,12 @@ int main(void)
 			GPIOC->ODR ^= (1U << B_LED);          // Toggle LED (active LOW)
 			for (volatile int i = 0; i < 50000; i++); // Debounce
 		}
+
+		UART1_Receive_Str(name2);
+		for (volatile int i = 0; i < 50000; i++); // Debounce
+		UART1_Send_Str("Rx: ");
+		UART1_Send_Str(name2);
+
 		for (volatile int i = 0; i < 90000; i++); // Debounce
 	}
 }
