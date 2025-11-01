@@ -206,9 +206,8 @@ int main(void)
 
 	UART1_Init();
 
-	char dc = 'P'; // 2 - 50, P - 80
-
-	Motor_TIM1_PWM_SetDutyCycle(dc);
+	 char dc = 'P'; // 2 - 50, P - 80
+	 Motor_TIM1_PWM_SetDutyCycle(dc);
 
 	while(1)
 	{
@@ -216,15 +215,19 @@ int main(void)
 //		{
 //			while(!(GPIOA->IDR & (1<<Btn)));
 //			GPIOC->ODR ^= (1U << B_LED);          // Toggle LED (active LOW)
-//			UART1_Send_Str(name);
+//			UART1_Send_Str("HI\n");
 //			for (volatile int i = 0; i < 20000; i++); // Debounce
 //		}
 
 		dc=UART1_Receive_Char();
+		for (volatile int i = 0; i < 20000; i++); // Debounce
+		UART1_Send_Char(dc);
+
 		if (dc=='2'){ GPIOC->ODR |= (1U << B_LED); }
 		else{ GPIOC->ODR &= ~(1U << B_LED); }
 
-		Motor_TIM1_PWM_SetDutyCycle(dc);
+		Motor_TIM1_PWM_SetDutyCycle((dc-'0'));
+		Servo_TIM2_PWM_SetDutyCycle((dc-'0'));
 
 		for (volatile int i = 0; i < 50000; i++); // delay
 	}
