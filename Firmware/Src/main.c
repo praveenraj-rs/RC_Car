@@ -14,6 +14,61 @@
 #define Tx1	9				// PA9 Tx UART1
 #define Rx1 10				// PA10 Rx UART1
 
+
+// Function Prototyping
+void SystemClock_Init(void);
+
+void B_LED_Init(void);
+void Btn_Init(void);
+
+void TIM3_Delay(uint16_t delay_ms);
+
+void Motor_TIM1_PWM_Init(void);
+void Motor_TIM1_PWM_SetDutyCycle(uint8_t duty_cycle);
+
+void Servo_TIM2_PWM_Init(void);
+void Servo_TIM2_PWM_SetDutyCycle(uint8_t duty_cycle);
+
+void UART1_Init(void);
+void UART1_Send_Char(char c);
+void UART1_Send_Str(char *str);
+char UART1_Receive_Char(void);
+void UART1_Receive_Str(char *str);
+
+int main(void)
+{
+	SystemClock_Init(); // Selecting HSE 25MHz
+
+	B_LED_Init();
+	Btn_Init();
+
+	Motor_TIM1_PWM_Init();			// Motor PWM init
+	Motor_TIM1_PWM_SetDutyCycle(50);  // 50% duty cycle
+
+	Servo_TIM2_PWM_Init();			// Motor PWM init
+	Servo_TIM2_PWM_SetDutyCycle(2);  // 5% duty cycle
+
+	UART1_Init();
+
+	while(1)
+	{
+		for (int dc = 1; dc<=10; dc++)
+		{
+			Servo_TIM2_PWM_SetDutyCycle(dc);
+			TIM3_Delay(250);
+		}
+
+		TIM3_Delay(500);
+
+		for (int dc = 10; dc>=1; dc--)
+		{
+			Servo_TIM2_PWM_SetDutyCycle(dc);
+			TIM3_Delay(250);
+		}
+	}
+}
+
+
 void SystemClock_Init(void)
 {
    // Enable HSE
@@ -51,6 +106,25 @@ void Btn_Init(void)
    GPIOA->MODER &= ~(3U << (Btn * 2));    // 00: Input mode
    GPIOA->PUPDR &= ~(3U << (Btn * 2));    // Clear reg
    GPIOA->PUPDR |= (1U << (Btn * 2));    // Pull-up config
+}
+
+void TIM3_Delay(uint16_t delay_ms)
+{
+	 RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+
+	 uint32_t prescaler = (SysClk / 1000) - 1;	// Timer clock = 1 KHz or 1ms
+	 TIM3->PSC = prescaler - 1;					// Prescaler update
+
+	 TIM3->ARR = delay_ms - 1;   			// Auto-reload 1 second delay (1ms * 999)
+	 TIM3->CNT = 0;							// Reset the counter
+	 TIM3->EGR |= (1 << 0);  				// Event generation
+
+	 TIM3->SR &= ~ (1 << 0);  				// Clear update interrupt flag
+	 TIM3->CR1 |= (1 << 0); 				// Enable Timer
+
+	 while (!(TIM3->SR & (1 << 0))){} 		// Until UIF NEQ 1
+	 TIM3->SR &= ~(1 << 0); 				//UIF is cleared manually
+	 TIM3->CR1 &= ~(1 << 0); 				//CEN is cleared
 }
 
 void Motor_TIM1_PWM_Init(void)
@@ -115,8 +189,8 @@ void Servo_TIM2_PWM_Init(void)
 
   // Timer configuration
   // Timer frequency = sysclk / (PSC+1) / (ARR+1)
-  uint32_t prescaler = (SysClk / 1000) - 1;				// Timer clock = 1 KHz
-  uint32_t period = (1000 / Servo_PWM_Freq) - 1;		// ARR
+  uint32_t prescaler = (SysClk / 1000000) - 1;			// Timer clock = 1MHz
+  uint32_t period = (1000000 / Servo_PWM_Freq) - 1;		// ARR
   TIM2->PSC = prescaler;								// Prescaler update
   TIM2->ARR = period;									// ARR update
   TIM2->CCR1 = period / 2;  							// default 50% duty cycle
@@ -136,8 +210,8 @@ void Servo_TIM2_PWM_Init(void)
 
 void Servo_TIM2_PWM_SetDutyCycle(uint8_t duty_cycle)
 {
-  if(duty_cycle > 100) duty_cycle = 100;
-  TIM2->CCR1 = ((TIM2->ARR + 1) * duty_cycle) / 100;
+	if(duty_cycle > 100) duty_cycle = 100;
+	TIM2->CCR1 = ((TIM2->ARR + 1) * duty_cycle) / 100;
 }
 
 void UART1_Init(void)
@@ -189,47 +263,5 @@ void UART1_Receive_Str(char *buffer)
        buffer[i++] = c;
    } while (c != '\n' && c != '\r');  	// until newline or carriage return
    buffer[i] = '\0';  					// null terminate
-}
-
-int main(void)
-{
-	SystemClock_Init(); // Selecting HSE 25MHz
-
-	B_LED_Init();
-	Btn_Init();
-
-	Motor_TIM1_PWM_Init();			// Motor PWM init
-	Motor_TIM1_PWM_SetDutyCycle(50);  // 50% duty cycle
-
-	Servo_TIM2_PWM_Init();			// Motor PWM init
-	Servo_TIM2_PWM_SetDutyCycle(50);  // 80% duty cycle
-
-	UART1_Init();
-
-	 char dc = 'P'; // 2 - 50, P - 80
-	 Motor_TIM1_PWM_SetDutyCycle(dc);
-
-	while(1)
-	{
-//		if (!(GPIOA->IDR & (1<<Btn)))
-//		{
-//			while(!(GPIOA->IDR & (1<<Btn)));
-//			GPIOC->ODR ^= (1U << B_LED);          // Toggle LED (active LOW)
-//			UART1_Send_Str("HI\n");
-//			for (volatile int i = 0; i < 20000; i++); // Debounce
-//		}
-
-		dc=UART1_Receive_Char();
-		for (volatile int i = 0; i < 20000; i++); // Debounce
-		UART1_Send_Char(dc);
-
-		if (dc=='2'){ GPIOC->ODR |= (1U << B_LED); }
-		else{ GPIOC->ODR &= ~(1U << B_LED); }
-
-		Motor_TIM1_PWM_SetDutyCycle((dc-'0'));
-		Servo_TIM2_PWM_SetDutyCycle((dc-'0'));
-
-		for (volatile int i = 0; i < 50000; i++); // delay
-	}
 }
 
