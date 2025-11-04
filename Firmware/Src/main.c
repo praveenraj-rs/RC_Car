@@ -28,12 +28,19 @@ void Motor_TIM1_PWM_SetDutyCycle(uint8_t duty_cycle);
 
 void Servo_TIM2_PWM_Init(void);
 void Servo_TIM2_PWM_SetDutyCycle(uint8_t duty_cycle);
+void Servo_TIM2_PWM_SetAngle(uint8_t angle);
 
 void UART1_Init(void);
 void UART1_Send_Char(char c);
 void UART1_Send_Str(char *str);
 char UART1_Receive_Char(void);
 void UART1_Receive_Str(char *str);
+
+
+// Testing Functions
+void LED_Btn_Check(void);
+void Servo_Check(void);
+void Motor_Check(void);
 
 int main(void)
 {
@@ -52,19 +59,7 @@ int main(void)
 
 	while(1)
 	{
-		for (int dc = 1; dc<=10; dc++)
-		{
-			Servo_TIM2_PWM_SetDutyCycle(dc);
-			TIM3_Delay(250);
-		}
-
-		TIM3_Delay(500);
-
-		for (int dc = 10; dc>=1; dc--)
-		{
-			Servo_TIM2_PWM_SetDutyCycle(dc);
-			TIM3_Delay(250);
-		}
+		Servo_Check();
 	}
 }
 
@@ -214,6 +209,21 @@ void Servo_TIM2_PWM_SetDutyCycle(uint8_t duty_cycle)
 	TIM2->CCR1 = ((TIM2->ARR + 1) * duty_cycle) / 100;
 }
 
+void Servo_TIM2_PWM_SetAngle(uint8_t angle)
+{
+
+//	#define MIN_PULSE_WIDTH       544     // the shortest pulse sent to a servo
+//	#define MAX_PULSE_WIDTH      2400     // the longest pulse sent to a servo
+//	#define DEFAULT_PULSE_WIDTH  1500     // default pulse width when servo is attached
+//	#define REFRESH_INTERVAL    20000     // minimum time to refresh servos in microseconds
+
+	if(angle > 180) angle = 180;
+	if(angle < 0) 	angle = 0;
+
+	// CCR =  MIN_PULSE_WIDTH + ((MAX_PULSE_WIDTH - MIN_PULSE_WIDTH)/180)*angle
+	TIM2->CCR1 = 544 + (10.312*angle);
+}
+
 void UART1_Init(void)
 {
 	 // Enable clocks for GPIOA and USART1
@@ -265,3 +275,24 @@ void UART1_Receive_Str(char *buffer)
    buffer[i] = '\0';  					// null terminate
 }
 
+
+// ----------------------------------------------------
+// Testing Functions
+// ----------------------------------------------------
+void Servo_Check(void)
+{
+	for (int angle = 0 ; angle<=180; angle+=30)
+	{
+		Servo_TIM2_PWM_SetAngle(angle);
+		TIM3_Delay(50);
+	}
+
+	TIM3_Delay(500);
+
+	for (int angle = 180; angle>=0; angle-=30)
+	{
+		Servo_TIM2_PWM_SetAngle(angle);
+		TIM3_Delay(50);
+	}
+	TIM3_Delay(500);
+}
