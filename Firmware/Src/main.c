@@ -37,10 +37,13 @@ char UART1_Receive_Char(void);
 void UART1_Receive_Str(char *str);
 
 
-// Testing Functions
-void LED_Btn_Check(void);
-void Servo_Check(void);
-void Motor_Check(void);
+// Checking/Testing Functions
+void CK_LED_Blink(void);	// LED blink
+void CK_LED_Btn(void); 		// Toggle LED with button press
+void CK_Servo(void);		// Check 9g servo
+
+// Checking/Testing Car Functions
+void CK_Car_Servo(void);	// Car servo check
 
 int main(void)
 {
@@ -59,7 +62,12 @@ int main(void)
 
 	while(1)
 	{
-		Servo_Check();
+		Servo_TIM2_PWM_SetAngle(60);
+		TIM3_Delay(1000);
+		Servo_TIM2_PWM_SetAngle(90);
+		TIM3_Delay(1000);
+		Servo_TIM2_PWM_SetAngle(120);
+		TIM3_Delay(1000);
 	}
 }
 
@@ -279,7 +287,14 @@ void UART1_Receive_Str(char *buffer)
 // ----------------------------------------------------
 // Testing Functions
 // ----------------------------------------------------
-void Servo_Check(void)
+
+void CK_LED_Blink(void)
+{
+	GPIOC->ODR ^= (1<<B_LED);
+	TIM3_Delay(1000);
+}
+
+void CK_Servo(void)
 {
 	for (int angle = 0 ; angle<=180; angle+=30)
 	{
@@ -290,6 +305,30 @@ void Servo_Check(void)
 	TIM3_Delay(500);
 
 	for (int angle = 180; angle>=0; angle-=30)
+	{
+		Servo_TIM2_PWM_SetAngle(angle);
+		TIM3_Delay(50);
+	}
+	TIM3_Delay(500);
+}
+
+void CK_Car_Servo(void)
+{
+	// 0  - Go Left
+	// 45 - Go Straight
+	// 90 -	Go Right
+
+	int max_angle = 90;
+
+	for (int angle = 0 ; angle<=max_angle; angle+=30)
+	{
+		Servo_TIM2_PWM_SetAngle(angle);
+		TIM3_Delay(50);
+	}
+
+	TIM3_Delay(500);
+
+	for (int angle = max_angle; angle>=0; angle-=30)
 	{
 		Servo_TIM2_PWM_SetAngle(angle);
 		TIM3_Delay(50);
