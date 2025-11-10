@@ -52,22 +52,45 @@ int main(void)
 	B_LED_Init();
 	Btn_Init();
 
-	Motor_TIM1_PWM_Init();			// Motor PWM init
-	Motor_TIM1_PWM_SetDutyCycle(50);  // 50% duty cycle
+	Motor_TIM1_PWM_Init();				// Motor PWM init
+	Motor_TIM1_PWM_SetDutyCycle(0);  	// 0% duty cycle
 
-	Servo_TIM2_PWM_Init();			// Motor PWM init
-	Servo_TIM2_PWM_SetDutyCycle(2);  // 5% duty cycle
+	Servo_TIM2_PWM_Init();				// Motor PWM init
+	Servo_TIM2_PWM_SetDutyCycle(2);  	// 5% duty cycle
 
 	UART1_Init();
 
+	int count=0;
+	char name[10]=" ";
+
 	while(1)
 	{
-		Servo_TIM2_PWM_SetAngle(60);
-		TIM3_Delay(1000);
-		Servo_TIM2_PWM_SetAngle(90);
-		TIM3_Delay(1000);
-		Servo_TIM2_PWM_SetAngle(120);
-		TIM3_Delay(1000);
+		if (!(GPIOA->IDR & (1<<Btn)))
+		{
+			while(!(GPIOA->IDR & (1<<Btn))){}
+			TIM3_Delay(30);
+			count++;
+			count %=(5+1);
+
+			UART1_Send_Char(count+48);
+//			UART1_Send_Str("Praveenraj R S\n");
+			UART1_Receive_Str(name);
+			UART1_Send_Str(name);
+			GPIOC->ODR ^= (1<<B_LED);
+		}
+
+//		if (!(GPIOA->IDR & (1<<Btn)))
+//		{
+//			while(!(GPIOA->IDR & (1<<Btn))){}
+//			TIM3_Delay(30);
+//			count++;
+//			count %=(5+1);
+//
+//			Motor_TIM1_PWM_SetDutyCycle(count*20);
+//			Servo_TIM2_PWM_SetAngle(count*15);
+//
+//			GPIOC->ODR ^= (1<<B_LED);
+//		}
 	}
 }
 
@@ -150,7 +173,7 @@ void Motor_TIM1_PWM_Init(void)
   uint32_t period = (1000000 / Motor_PWM_Freq) - 1;	// ARR
   TIM1->PSC = prescaler;								// Prescaler update
   TIM1->ARR = period;									// ARR update
-  TIM1->CCR1 = period / 2;  							// default 50% duty cycle
+  TIM1->CCR1 = 0;  							// default 0% duty cycle
 
   // PWM mode 1, preload enable
   TIM1->CCMR1 &= ~(7U << 4);			// Clear reg
@@ -292,6 +315,16 @@ void CK_LED_Blink(void)
 {
 	GPIOC->ODR ^= (1<<B_LED);
 	TIM3_Delay(1000);
+}
+
+void CK_LED_Btn(void)
+{
+	if (!(GPIOA->IDR & (1<<Btn)))
+	{
+		while(!(GPIOA->IDR & (1<<Btn))){}
+		TIM3_Delay(20);
+		GPIOC->ODR ^= (1<<B_LED);
+	}
 }
 
 void CK_Servo(void)
