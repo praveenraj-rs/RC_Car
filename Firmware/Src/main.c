@@ -14,6 +14,9 @@
 #define Tx1	9				// PA9 Tx UART1
 #define Rx1 10				// PA10 Rx UART1
 
+#define Motor_DC1	12		// PB12 Motor Direction Control
+#define Motor_DC2	13		// PB13 Motor Direction Control
+
 
 // Function Prototyping
 void SystemClock_Init(void);
@@ -36,6 +39,8 @@ void UART1_Send_Str(char *str);
 char UART1_Receive_Char(void);
 void UART1_Receive_Str(char *str);
 
+void Motor_Direction_Control_Init(void);
+void Motor_Direction_Control(char Direction);
 
 // Checking/Testing Functions
 void CK_LED_Blink(void);	// LED blink
@@ -60,8 +65,10 @@ int main(void)
 
 	UART1_Init();
 
+	Motor_Direction_Control_Init();
+
 	int count=0;
-	char name[10]=" ";
+	// char name[10]=" ";
 
 	while(1)
 	{
@@ -70,14 +77,44 @@ int main(void)
 			while(!(GPIOA->IDR & (1<<Btn))){}
 			TIM3_Delay(30);
 			count++;
-			count %=(5+1);
+			count %=3;
 
-			UART1_Send_Char(count+48);
-//			UART1_Send_Str("Praveenraj R S\n");
-			UART1_Receive_Str(name);
-			UART1_Send_Str(name);
-			GPIOC->ODR ^= (1<<B_LED);
+			if (count==0)
+			{
+				Motor_Direction_Control('S');
+				GPIOC->ODR &= ~(1<<B_LED);
+			}
+			else if (count==1)
+			{
+				Motor_Direction_Control('S');
+				TIM3_Delay(800);
+				Motor_Direction_Control('F');
+				GPIOC->ODR |= (1<<B_LED);
+
+			}
+			else if (count==2)
+			{
+				Motor_Direction_Control('S');
+				TIM3_Delay(800);
+				Motor_Direction_Control('B');
+				GPIOC->ODR |= (1<<B_LED);
+			}
 		}
+		TIM3_Delay(200);
+
+//		if (!(GPIOA->IDR & (1<<Btn)))
+//		{
+//			while(!(GPIOA->IDR & (1<<Btn))){}
+//			TIM3_Delay(30);
+//			count++;
+//			count %=(5+1);
+//
+//			UART1_Send_Char(count+48);
+////			UART1_Send_Str("Praveenraj R S\n");
+//			UART1_Receive_Str(name);
+//			UART1_Send_Str(name);
+//			GPIOC->ODR ^= (1<<B_LED);
+//		}
 
 //		if (!(GPIOA->IDR & (1<<Btn)))
 //		{
@@ -307,6 +344,57 @@ void UART1_Receive_Str(char *buffer)
 }
 
 
+void Motor_Direction_Control_Init(void)
+{
+	// PB12, PB13
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; 	// Enable GPIOB clock
+
+	GPIOB->MODER &= ~(3U << (Motor_DC1 * 2));	// Clear reg
+	GPIOB->MODER &= ~(3U << (Motor_DC2 * 2));	// Clear reg
+
+	GPIOB->MODER |=  (1U << (Motor_DC1 * 2));  	// Output mode
+	GPIOB->MODER |=  (1U << (Motor_DC2 * 2));  	// Output mode
+
+	GPIOB->OTYPER &= ~(1U << Motor_DC1);		// Push-pull
+	GPIOB->OTYPER &= ~(1U << Motor_DC2);		// Push-pull
+
+	GPIOB->PUPDR &= ~(3U << (Motor_DC1 * 2));	// No pull-up or pull-down
+	GPIOB->PUPDR &= ~(3U << (Motor_DC2 * 2));	// No pull-up or pull-down
+
+	// Motor in OFF Condition
+	// PB12 - Low && PB13 - Low
+	GPIOB->ODR &= ~(1<<Motor_DC1);				// Motor_DC1 low
+	GPIOB->ODR &= ~(1<<Motor_DC2);				// Motor_DC2 low
+}
+
+
+void Motor_Direction_Control(char Direction)
+{
+	// Directions
+	// F = Forward
+	// B = Backward
+	// S = Stop
+
+	if (Direction=='S')
+	{
+		GPIOB->ODR &= ~(1<<Motor_DC1);				// Motor_DC1 low
+		GPIOB->ODR &= ~(1<<Motor_DC2);				// Motor_DC2 low
+	}
+
+	else if (Direction=='F')
+	{
+		GPIOB->ODR |= (1<<Motor_DC1);				// Motor_DC1 high
+		GPIOB->ODR &= ~(1<<Motor_DC2);				// Motor_DC2 low
+	}
+
+	else if (Direction=='B')
+	{
+		GPIOB->ODR &= ~(1<<Motor_DC1);				// Motor_DC1 low
+		GPIOB->ODR |= (1<<Motor_DC2);				// Motor_DC2 high
+	}
+}
+
+
 // ----------------------------------------------------
 // Testing Functions
 // ----------------------------------------------------
@@ -368,3 +456,7 @@ void CK_Car_Servo(void)
 	}
 	TIM3_Delay(500);
 }
+
+
+
+
