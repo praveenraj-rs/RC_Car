@@ -1,4 +1,7 @@
 #include "stm32f4xx.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define SysClk 25000000U 	// 25MHz HSE system clock freq
 
@@ -40,7 +43,9 @@ char UART1_Receive_Char(void);
 void UART1_Receive_Str(char *str);
 
 void Motor_Direction_Control_Init(void);
-void Motor_Direction_Control(char Direction);
+void Motor_Direction_Control(uint8_t Direction);
+
+void Car_Control(uint8_t Steer,uint8_t Throttle, uint8_t Dir);
 
 // Checking/Testing Functions
 void CK_LED_Blink(void);	// LED blink
@@ -50,6 +55,40 @@ void CK_Servo(void);		// Check 9g servo
 // Checking/Testing Car Functions
 void CK_Car_Servo(void);	// Car servo check
 
+uint8_t UART_ReadPacket(uint8_t *steer, uint8_t *throttle, uint8_t *dir)
+{
+	// Packet: <S,45,0,0>
+    static char buffer[32];
+    static uint8_t index = 0;
+
+    while (USART1->SR & USART_SR_RXNE)      // Check data available
+    {
+        char c = USART1->DR & 0xFF;
+
+        if (c == '<') {
+            index = 0;
+        }
+        else if (c == '>') {
+            buffer[index] = '\0';
+
+            // Parse: S,steer,throttle,direction
+            char *tok = strtok(buffer, ","); // skip 'S'
+            tok = strtok(NULL, ","); *steer = atoi(tok);
+            tok = strtok(NULL, ","); *throttle = atoi(tok);
+            tok = strtok(NULL, ","); *dir = atoi(tok);
+
+            return 1;   // Packet ready
+        }
+        else {
+            if (index < 31)
+                buffer[index++] = c;
+        }
+    }
+
+    return 0; // No complete packet yet
+}
+
+
 int main(void)
 {
 	SystemClock_Init(); // Selecting HSE 25MHz
@@ -58,76 +97,58 @@ int main(void)
 	Btn_Init();
 
 	Motor_TIM1_PWM_Init();				// Motor PWM init
-	Motor_TIM1_PWM_SetDutyCycle(0);  	// 0% duty cycle
+	Motor_TIM1_PWM_SetDutyCycle(50);  	// 0% duty cycle
 
 	Servo_TIM2_PWM_Init();				// Motor PWM init
-	Servo_TIM2_PWM_SetDutyCycle(2);  	// 5% duty cycle
+	// Servo_TIM2_PWM_SetDutyCycle(2);  // 5% duty cycle
+	Servo_TIM2_PWM_SetAngle(45);		// Steer 45 - Straight
 
 	UART1_Init();
 
 	Motor_Direction_Control_Init();
 
-	int count=0;
+	uint8_t steer, throttle, dir;
+
+	// int count=0;
 	// char name[10]=" ";
 
 	while(1)
 	{
-		if (!(GPIOA->IDR & (1<<Btn)))
-		{
-			while(!(GPIOA->IDR & (1<<Btn))){}
-			TIM3_Delay(30);
-			count++;
-			count %=3;
-
-			if (count==0)
-			{
-				Motor_Direction_Control('S');
-				GPIOC->ODR &= ~(1<<B_LED);
-			}
-			else if (count==1)
-			{
-				Motor_Direction_Control('S');
-				TIM3_Delay(800);
-				Motor_Direction_Control('F');
-				GPIOC->ODR |= (1<<B_LED);
-
-			}
-			else if (count==2)
-			{
-				Motor_Direction_Control('S');
-				TIM3_Delay(800);
-				Motor_Direction_Control('B');
-				GPIOC->ODR |= (1<<B_LED);
-			}
-		}
-		TIM3_Delay(200);
+	    if (UART_ReadPacket(&steer, &throttle, &dir))
+	    {
+	        // Apply control to car
+	        Car_Control(steer, throttle, dir);
+	    }
 
 //		if (!(GPIOA->IDR & (1<<Btn)))
 //		{
 //			while(!(GPIOA->IDR & (1<<Btn))){}
 //			TIM3_Delay(30);
 //			count++;
-//			count %=(5+1);
+//			count %=3;
 //
-//			UART1_Send_Char(count+48);
-////			UART1_Send_Str("Praveenraj R S\n");
-//			UART1_Receive_Str(name);
-//			UART1_Send_Str(name);
-//			GPIOC->ODR ^= (1<<B_LED);
+//			if (count==0)
+//			{
+//				GPIOC->ODR &= ~(1<<B_LED);
+//				Motor_Direction_Control(0); 	// Motor Stop
+//			}
+//			else if (count==1)
+//			{
+//				GPIOC->ODR |= (1<<B_LED);
+//				Motor_Direction_Control(0);		// Motor Stop
+//				TIM3_Delay(800);
+//				Motor_Direction_Control(1);		// Motor Forward
+//			}
+//			else if (count==2)
+//			{
+//				GPIOC->ODR |= (1<<B_LED);
+//				Motor_Direction_Control(0);		// Motor Stop
+//				TIM3_Delay(800);
+//				Motor_Direction_Control(2);		// Motor Backward
+//
+//			}
 //		}
-
-//		if (!(GPIOA->IDR & (1<<Btn)))
-//		{
-//			while(!(GPIOA->IDR & (1<<Btn))){}
-//			TIM3_Delay(30);
-//			count++;
-//			count %=(5+1);
-//
-//			Motor_TIM1_PWM_SetDutyCycle(count*20);
-//			Servo_TIM2_PWM_SetAngle(count*15);
-//
-//			GPIOC->ODR ^= (1<<B_LED);
-//		}
+//		TIM3_Delay(200);
 	}
 }
 
@@ -289,7 +310,8 @@ void Servo_TIM2_PWM_SetAngle(uint8_t angle)
 	if(angle < 0) 	angle = 0;
 
 	// CCR =  MIN_PULSE_WIDTH + ((MAX_PULSE_WIDTH - MIN_PULSE_WIDTH)/180)*angle
-	TIM2->CCR1 = 544 + (10.312*angle);
+	// TIM2->CCR1 = 544 + (10.312*angle);
+	 TIM2->CCR1 = 544 + (((2400-544)/180)*angle);
 }
 
 void UART1_Init(void)
@@ -368,26 +390,26 @@ void Motor_Direction_Control_Init(void)
 }
 
 
-void Motor_Direction_Control(char Direction)
+void Motor_Direction_Control(uint8_t Direction)
 {
 	// Directions
-	// F = Forward
-	// B = Backward
-	// S = Stop
+	// 0 = Stop
+	// 1 = Forward
+	// 2 = Backward
 
-	if (Direction=='S')
+	if (Direction==0)
 	{
 		GPIOB->ODR &= ~(1<<Motor_DC1);				// Motor_DC1 low
 		GPIOB->ODR &= ~(1<<Motor_DC2);				// Motor_DC2 low
 	}
 
-	else if (Direction=='F')
+	else if (Direction==1)
 	{
 		GPIOB->ODR |= (1<<Motor_DC1);				// Motor_DC1 high
 		GPIOB->ODR &= ~(1<<Motor_DC2);				// Motor_DC2 low
 	}
 
-	else if (Direction=='B')
+	else if (Direction==2)
 	{
 		GPIOB->ODR &= ~(1<<Motor_DC1);				// Motor_DC1 low
 		GPIOB->ODR |= (1<<Motor_DC2);				// Motor_DC2 high
@@ -455,6 +477,18 @@ void CK_Car_Servo(void)
 		TIM3_Delay(50);
 	}
 	TIM3_Delay(500);
+}
+
+
+void Car_Control(uint8_t Steer,uint8_t Throttle, uint8_t Dir)
+{
+	// Steer: 	0-90, 0-Left, 45-Straight, 90-Right
+	// Throttle: 	0-100
+	// Direction:	0-Stop, 1-Forward, 2-Backward
+
+	Servo_TIM2_PWM_SetAngle(Steer);
+	Motor_Direction_Control(Dir);
+	Motor_TIM1_PWM_SetDutyCycle(Throttle);
 }
 
 
