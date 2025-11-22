@@ -1,0 +1,10 @@
+../Src/main.c:29:5:main	7
+../Src/main.c:81:6:SystemClock_Init	3
+../Src/main.c:102:6:B_LED_Init	1
+../Src/main.c:112:6:Btn_Init	1
+../Src/main.c:120:6:TIM3_Delay	2
+../Src/main.c:139:6:UART1_Init	1
+../Src/main.c:159:6:UART1_Send_Char	2
+../Src/main.c:165:6:UART1_Send_Str	2
+../Src/main.c:173:6:UART1_Receive_Char	2
+../Src/main.c:179:6:UART1_Receive_Str	3
