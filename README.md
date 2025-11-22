@@ -158,8 +158,9 @@ bool UART1_Receive_Packet(uint8_t *steer, uint8_t *throttle, uint8_t *dir)
 
 ## Demonstration
 
-![car image](./Images/car_img.png)
+![rc_car flowchart](./Images/rc_car_flowchart.png)
 
+![rc_cat image](./Images/rc_car_img.png)
 
 ---
 
