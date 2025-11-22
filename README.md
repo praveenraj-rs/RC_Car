@@ -13,7 +13,7 @@ The system drives a **BO DC motor** using an **L298N motor driver**, controls fr
 
 ## Features
 
-* **Embedded C firmware (bare-metal, register level)**
+* **Embedded C firmware (bare-metal (CMSIS), register level)**
 * Custom drivers for:
   * TIM1 PWM → Motor (1 kHz)
   * TIM2 PWM → Servo (50 Hz)
@@ -60,7 +60,7 @@ The system drives a **BO DC motor** using an **L298N motor driver**, controls fr
 | **L298N Motor Driver**       | H-bridge for throttle + direction                        |
 | **Tower Pro MG995 Servo**    | Steering (high-torque, 50 Hz PWM)                        |
 | **HC-05 Bluetooth Module**   | Wireless control from smartphone                         |
-| **Buck Converter**           | Regulates battery voltage to 5 V for MCU + HC-05 |
+| **Buck Converter**           | Regulates battery voltage to 5 V for MCU + HC-05         |
 | **Li-ion / LiPo Battery**    | Main power source                                        |
 | **Smartphone**               | Sends control packets over Bluetooth                     |
 
@@ -158,11 +158,8 @@ bool UART1_Receive_Packet(uint8_t *steer, uint8_t *throttle, uint8_t *dir)
 
 ## Demonstration
 
-```
 ![car image](./Images/img4.jpg)
-```
 
----
 
 ---
 
